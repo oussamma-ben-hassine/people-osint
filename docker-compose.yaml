@@ -16,13 +16,8 @@ services:
       - "3000"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.services.people-web.loadbalancer.server.port=3000"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/manifest.json"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
     networks:
       coolify:
         aliases:
@@ -94,6 +89,8 @@ services:
     image: people-api:latest
     restart: always
     command: ["celery", "-A", "app.workers.celery_app", "worker", "-l", "info", "-c", "4"]
+    healthcheck:
+      disable: true
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-people_user}:${POSTGRES_PASSWORD:-people_sec_db_2026}@people-postgres:5432/${POSTGRES_DB:-people_db}
       - REDIS_URL=redis://people-redis:6379/0
@@ -115,6 +112,8 @@ services:
     image: people-api:latest
     restart: always
     command: ["celery", "-A", "app.workers.celery_app", "beat", "-l", "info"]
+    healthcheck:
+      disable: true
     environment:
       - REDIS_URL=redis://people-redis:6379/0
     networks:
@@ -164,10 +163,11 @@ services:
   people-searxng:
     image: searxng/searxng:latest
     restart: always
-    volumes:
-      - ./infrastructure/searxng/settings.yml:/etc/searxng/settings.yml:ro
     environment:
       - SEARXNG_BASE_URL=http://people-searxng:8080
+      - SEARXNG_SECRET=people_osint_searxng_secret_key_2026
+    healthcheck:
+      disable: true
     networks:
       internal_net:
         aliases:
