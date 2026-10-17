@@ -19,7 +19,7 @@ export default function CallbackPage() {
     }
 
     // Call backend callback endpoint to finalize token exchange & session
-    fetch(`/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`)
+    fetch(`/api/v1/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`)
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json().catch(() => ({ detail: 'Échec de validation SSO' }));

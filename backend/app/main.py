@@ -54,6 +54,7 @@ app.add_middleware(
 
 # Register Routers
 app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(health_router)
 app.include_router(searches_router, prefix="/api/v1")
 app.include_router(cases_router, prefix="/api/v1")

@@ -37,9 +37,9 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
 
 export const api = {
   // Auth
-  getMe: () => fetchJson<User>('/auth/me'),
-  getLoginUrl: () => fetchJson<{ authorization_url: string; state: string }>('/auth/login'),
-  logout: () => fetchJson<{ status: string }>('/auth/logout', { method: 'POST' }),
+  getMe: () => fetchJson<User>('/api/v1/auth/me'),
+  getLoginUrl: () => fetchJson<{ authorization_url: string; state: string }>('/api/v1/auth/login'),
+  logout: () => fetchJson<{ status: string }>('/api/v1/auth/logout', { method: 'POST' }),
 
   // Searches
   createSearch: (data: any) => fetchJson<SearchJob>('/api/v1/searches', { method: 'POST', body: JSON.stringify(data) }),
