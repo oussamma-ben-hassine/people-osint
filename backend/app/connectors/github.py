@@ -25,7 +25,7 @@ class GitHubConnector(SearchConnector):
         full_name = f"{first_name} {last_name}".strip()
         org = query_params.get("organization", "")
         
-        q_parts = [f'fullname:"{full_name}"']
+        q_parts = [f'"{full_name}"']
         if org:
             q_parts.append(f'org:"{org}"')
 
