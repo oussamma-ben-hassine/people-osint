@@ -134,3 +134,26 @@ async def delete_search(
     await db.delete(job)
     await db.commit()
     return {"status": "deleted"}
+
+@router.delete("/{id}/results/{result_id}")
+async def delete_search_result(
+    id: str,
+    result_id: str,
+    user: User = Depends(require_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(SearchJob).where(SearchJob.id == id, SearchJob.user_id == user.id)
+    res = await db.execute(stmt)
+    job = res.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Recherche introuvable.")
+
+    stmt_res = select(SearchResult).where(SearchResult.id == result_id, SearchResult.job_id == id)
+    res_item = (await db.execute(stmt_res)).scalar_one_or_none()
+    if not res_item:
+        raise HTTPException(status_code=404, detail="Résultat introuvable.")
+
+    await db.delete(res_item)
+    await db.commit()
+    return {"status": "deleted", "result_id": result_id}
+

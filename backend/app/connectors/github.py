@@ -62,12 +62,18 @@ class GitHubConnector(SearchConnector):
                         if bio:
                             snippet += f"Bio: {bio}"
 
+                        avatar = user.get("avatar_url")
+                        raw_user = dict(user)
+                        if avatar:
+                            raw_user["image_url"] = avatar
+
                         results.append(SearchResultItem(
                             connector=self.name,
                             source_url=profile_url,
                             title=f"{username} on GitHub",
                             snippet=snippet.strip(),
-                            raw_data=user,
+                            image_url=avatar,
+                            raw_data=raw_user,
                             confidence=0.9,
                             entity_hints={
                                 "username": username,

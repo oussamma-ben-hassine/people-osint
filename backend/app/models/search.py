@@ -59,3 +59,16 @@ class SearchResult(Base):
     raw_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    @property
+    def image_url(self) -> Optional[str]:
+        if not self.raw_data or not isinstance(self.raw_data, dict):
+            return None
+        return (
+            self.raw_data.get("image_url")
+            or self.raw_data.get("avatar_url")
+            or self.raw_data.get("img_src")
+            or self.raw_data.get("thumbnail_src")
+            or self.raw_data.get("thumbnail")
+        )
+

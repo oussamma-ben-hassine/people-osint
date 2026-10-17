@@ -26,6 +26,20 @@ export interface SearchJob {
   created_at: string;
 }
 
+export interface SearchResult {
+  id: string;
+  job_id: string;
+  case_id?: string;
+  connector: string;
+  source_url: string;
+  title: string;
+  snippet: string;
+  image_url?: string;
+  raw_data?: Record<string, any>;
+  created_at: string;
+}
+
+
 export interface ResearchCase {
   id: string;
   user_id: string;

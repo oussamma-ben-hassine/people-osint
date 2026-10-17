@@ -122,6 +122,9 @@ class SearchOrchestrator:
 
         # Persist SearchResults
         for item in deduped_results:
+            raw = dict(item.raw_data or {})
+            if item.image_url and "image_url" not in raw:
+                raw["image_url"] = item.image_url
             sr = SearchResult(
                 job_id=job.id,
                 case_id=case.id,
@@ -129,7 +132,7 @@ class SearchOrchestrator:
                 source_url=item.source_url,
                 title=item.title,
                 snippet=item.snippet,
-                raw_data=item.raw_data
+                raw_data=raw
             )
             db.add(sr)
         await db.flush()

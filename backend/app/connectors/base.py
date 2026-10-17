@@ -7,6 +7,7 @@ class SearchResultItem(BaseModel):
     source_url: str
     title: str
     snippet: str
+    image_url: Optional[str] = None
     raw_data: Dict[str, Any] = {}
     confidence: float = 0.8
     entity_hints: Dict[str, Any] = {}

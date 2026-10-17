@@ -6,10 +6,11 @@ import {
   Search, Sliders, Play, XCircle, CheckCircle2, Loader2,
   Building2, MapPin, Briefcase, Tag, Globe, Sparkles, ExternalLink,
   ShieldCheck, Share2, Download, Filter, Code2, GraduationCap,
-  Newspaper, UserCheck, Copy, Check, ChevronRight
+  Newspaper, UserCheck, Copy, Check, ChevronRight, Image as ImageIcon,
+  Trash2, X, Eye
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { SearchJob } from '@/lib/types';
+import { SearchJob, SearchResult } from '@/lib/types';
 
 export default function SearchPage() {
   const [firstName, setFirstName] = useState('');
@@ -26,14 +27,16 @@ export default function SearchPage() {
   const [enableAI, setEnableAI] = useState(true);
 
   const [activeJob, setActiveJob] = useState<SearchJob | null>(null);
-  const [jobResults, setJobResults] = useState<any[]>([]);
+  const [jobResults, setJobResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Results filtering and categories
+  // Results filtering, categories and deletion
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchFilter, setSearchFilter] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Polling for active search progress
   useEffect(() => {
@@ -104,6 +107,21 @@ export default function SearchPage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const handleDeleteResult = async (resultId: string) => {
+    if (!activeJob) return;
+    if (!confirm('Supprimer ce résultat de la synthèse d\'investigation ?')) return;
+
+    setDeletingId(resultId);
+    try {
+      await api.deleteSearchResult(activeJob.id, resultId);
+      setJobResults((prev) => prev.filter((r) => r.id !== resultId));
+    } catch (err: any) {
+      alert(err.message || 'Erreur lors de la suppression du résultat.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleExportJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
       target: {
@@ -126,10 +144,24 @@ export default function SearchPage() {
     downloadAnchor.remove();
   };
 
+  // Helper to get image URL from result
+  const getImageUrl = (r: SearchResult): string | null => {
+    return (
+      r.image_url ||
+      r.raw_data?.image_url ||
+      r.raw_data?.avatar_url ||
+      r.raw_data?.img_src ||
+      r.raw_data?.thumbnail_src ||
+      r.raw_data?.thumbnail ||
+      null
+    );
+  };
+
   // Categorize results
   const categorizedCounts = useMemo(() => {
     const counts = {
       ALL: jobResults.length,
+      IMAGES: 0,
       PROFILES: 0,
       CODE: 0,
       ACADEMIC: 0,
@@ -137,12 +169,16 @@ export default function SearchPage() {
     };
     jobResults.forEach((r) => {
       const c = (r.connector || '').toLowerCase();
+      const hasImg = !!getImageUrl(r);
+      if (hasImg || c.includes('images') || r.raw_data?.is_image) {
+        counts.IMAGES++;
+      }
       if (c.includes('github') || c.includes('gitlab')) {
         counts.CODE++;
         counts.PROFILES++;
       } else if (c.includes('orcid') || c.includes('crossref') || c.includes('openalex')) {
         counts.ACADEMIC++;
-      } else {
+      } else if (!c.includes('images')) {
         counts.WEB++;
       }
     });
@@ -152,11 +188,15 @@ export default function SearchPage() {
   const filteredResults = useMemo(() => {
     return jobResults.filter((r) => {
       const c = (r.connector || '').toLowerCase();
+      const img = getImageUrl(r);
+      const isImg = !!img || c.includes('images') || r.raw_data?.is_image;
+
       // Category filter
+      if (selectedCategory === 'IMAGES' && !isImg) return false;
       if (selectedCategory === 'CODE' && !(c.includes('github') || c.includes('gitlab'))) return false;
       if (selectedCategory === 'PROFILES' && !(c.includes('github') || c.includes('gitlab') || (r.title && r.title.toLowerCase().includes('profile')))) return false;
       if (selectedCategory === 'ACADEMIC' && !(c.includes('orcid') || c.includes('crossref') || c.includes('openalex'))) return false;
-      if (selectedCategory === 'WEB' && (c.includes('github') || c.includes('gitlab') || c.includes('orcid') || c.includes('crossref') || c.includes('openalex'))) return false;
+      if (selectedCategory === 'WEB' && (c.includes('github') || c.includes('gitlab') || c.includes('orcid') || c.includes('crossref') || c.includes('openalex') || c.includes('images'))) return false;
 
       // Text search
       if (searchFilter.trim()) {
@@ -172,6 +212,9 @@ export default function SearchPage() {
 
   const getConnectorBadgeStyle = (connector: string) => {
     const c = connector.toLowerCase();
+    if (c.includes('images')) {
+      return 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/40 dark:text-pink-300 dark:border-pink-800';
+    }
     if (c.includes('github')) {
       return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800';
     }
@@ -202,7 +245,7 @@ export default function SearchPage() {
             Enquête & Profilage OSINT Multi-Sources
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-            Recherche asynchrone unifiée : SearXNG, GitHub, GitLab, ORCID, Crossref & OpenAlex avec extraction sémantique des preuves et entités.
+            Recherche asynchrone unifiée : SearXNG (Web & Images), GitHub, GitLab, ORCID, Crossref & OpenAlex avec extraction sémantique.
           </p>
         </div>
 
@@ -348,7 +391,7 @@ export default function SearchPage() {
               >
                 <div className="text-xs font-bold text-blue-600 dark:text-blue-400">Recherche Pro</div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                  Dépôts de code, publications ORCID & parcours professionnel
+                  Dépôts de code, profils tech, ORCID & publications
                 </div>
               </button>
 
@@ -363,7 +406,7 @@ export default function SearchPage() {
               >
                 <div className="text-xs font-bold text-blue-600 dark:text-blue-400">Web Complet</div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                  Presse, articles, métamoteur SearXNG étendu & mentions web
+                  Presse, articles, métamoteur SearXNG, images & mentions web
                 </div>
               </button>
             </div>
@@ -530,26 +573,31 @@ export default function SearchPage() {
             </div>
 
             {/* Metrics Ribbon */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6">
-              <div className="p-4 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Sources</span>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{categorizedCounts.ALL}</div>
-                <span className="text-[10px] text-slate-500">Collectées avec succès</span>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-6">
+              <div className="p-3.5 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Sources</span>
+                <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{categorizedCounts.ALL}</div>
+                <span className="text-[10px] text-slate-500">Collectées</span>
               </div>
-              <div className="p-4 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Dépôts & Code</span>
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{categorizedCounts.CODE}</div>
+              <div className="p-3.5 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">Images & Médias</span>
+                <div className="text-xl font-bold text-pink-600 dark:text-pink-400 mt-0.5">{categorizedCounts.IMAGES}</div>
+                <span className="text-[10px] text-slate-500">Photos & Avatars</span>
+              </div>
+              <div className="p-3.5 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Dépôts & Code</span>
+                <div className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-0.5">{categorizedCounts.CODE}</div>
                 <span className="text-[10px] text-slate-500">GitHub & GitLab</span>
               </div>
-              <div className="p-4 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Recherche Scientifique</span>
-                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{categorizedCounts.ACADEMIC}</div>
-                <span className="text-[10px] text-slate-500">ORCID & DOIs Crossref</span>
+              <div className="p-3.5 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Publications</span>
+                <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{categorizedCounts.ACADEMIC}</div>
+                <span className="text-[10px] text-slate-500">ORCID & DOIs</span>
               </div>
-              <div className="p-4 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Mentions Web</span>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{categorizedCounts.WEB}</div>
-                <span className="text-[10px] text-slate-500">SearXNG Articles & Profils</span>
+              <div className="p-3.5 bg-slate-50/80 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Mentions Web</span>
+                <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-0.5">{categorizedCounts.WEB}</div>
+                <span className="text-[10px] text-slate-500">SearXNG Articles</span>
               </div>
             </div>
           </div>
@@ -566,10 +614,19 @@ export default function SearchPage() {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <span>Toutes les sources</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700">
-                  {categorizedCounts.ALL}
-                </span>
+                <span>Toutes ({categorizedCounts.ALL})</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('IMAGES')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                  selectedCategory === 'IMAGES'
+                    ? 'bg-white dark:bg-slate-800 text-pink-600 dark:text-pink-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <ImageIcon size={13} />
+                <span>Images & Médias ({categorizedCounts.IMAGES})</span>
               </button>
 
               <button
@@ -581,10 +638,7 @@ export default function SearchPage() {
                 }`}
               >
                 <Code2 size={13} />
-                <span>Code & Dépôts</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700">
-                  {categorizedCounts.CODE}
-                </span>
+                <span>Code ({categorizedCounts.CODE})</span>
               </button>
 
               <button
@@ -596,10 +650,7 @@ export default function SearchPage() {
                 }`}
               >
                 <GraduationCap size={13} />
-                <span>Publications</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700">
-                  {categorizedCounts.ACADEMIC}
-                </span>
+                <span>Publications ({categorizedCounts.ACADEMIC})</span>
               </button>
 
               <button
@@ -611,10 +662,7 @@ export default function SearchPage() {
                 }`}
               >
                 <Newspaper size={13} />
-                <span>Web & Médias</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700">
-                  {categorizedCounts.WEB}
-                </span>
+                <span>Web & Presse ({categorizedCounts.WEB})</span>
               </button>
             </div>
 
@@ -636,62 +684,201 @@ export default function SearchPage() {
             <div className="p-12 text-center bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-sm">
               Aucun résultat ne correspond aux filtres sélectionnés.
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredResults.map((r, i) => (
-                <div
-                  key={i}
-                  className="bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-5 space-y-3 hover:border-blue-500/50 hover:shadow-sm transition flex flex-col justify-between"
-                >
-                  <div className="space-y-2.5">
-                    {/* Header: Connector badge & External link */}
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center gap-1 font-bold text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${getConnectorBadgeStyle(r.connector)}`}>
-                        {r.connector}
-                      </span>
-                      <div className="flex items-center gap-2">
+          ) : selectedCategory === 'IMAGES' ? (
+            /* Dedicated Image Gallery Grid */
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {filteredResults.map((r, i) => {
+                const img = getImageUrl(r);
+                return (
+                  <div
+                    key={r.id || i}
+                    className="group bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800/80 rounded-2xl overflow-hidden hover:border-pink-500/50 hover:shadow-md transition flex flex-col justify-between"
+                  >
+                    <div className="relative aspect-square w-full bg-slate-100 dark:bg-slate-900 overflow-hidden cursor-pointer" onClick={() => img && setPreviewImage(img)}>
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={r.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          loading="lazy"
+                          onError={(e: any) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                          <ImageIcon size={32} />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                         <button
-                          onClick={() => handleCopyCitation(`${r.title} — ${r.source_url}`, i)}
-                          title="Copier la référence"
-                          className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            img && setPreviewImage(img);
+                          }}
+                          className="p-2 bg-white/90 text-slate-800 rounded-full hover:bg-white transition shadow-sm"
+                          title="Agrandir l'image"
                         >
-                          {copiedIndex === i ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          <Eye size={16} />
                         </button>
                         <a
                           href={r.source_url}
                           target="_blank"
                           rel="noreferrer"
-                          title="Consulter la source originale"
-                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 bg-white/90 text-slate-800 rounded-full hover:bg-white transition shadow-sm"
+                          title="Visiter la page source"
                         >
-                          <span>Visiter</span>
-                          <ExternalLink size={12} />
+                          <ExternalLink size={16} />
                         </a>
                       </div>
                     </div>
 
-                    {/* Title */}
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
-                      {r.title}
-                    </h3>
-
-                    {/* Snippet */}
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
-                      {r.snippet || 'Aucune description disponible pour cette source.'}
-                    </p>
+                    <div className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getConnectorBadgeStyle(r.connector)}`}>
+                          {r.connector}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteResult(r.id)}
+                          disabled={deletingId === r.id}
+                          title="Supprimer ce résultat"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                        >
+                          {deletingId === r.id ? <Loader2 size={13} className="animate-spin text-rose-500" /> : <Trash2 size={13} />}
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 truncate" title={r.title}>
+                        {r.title}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {r.source_url.replace(/^https?:\/\//, '').split('/')[0]}
+                      </p>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Standard OSINT Results Grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredResults.map((r, i) => {
+                const img = getImageUrl(r);
+                return (
+                  <div
+                    key={r.id || i}
+                    className="bg-white dark:bg-[#0f172a] border border-slate-200/90 dark:border-slate-800/80 rounded-2xl p-5 space-y-3 hover:border-blue-500/50 hover:shadow-sm transition flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      {/* Header: Connector badge, External link & Delete button */}
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center gap-1 font-bold text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${getConnectorBadgeStyle(r.connector)}`}>
+                          {r.connector}
+                        </span>
 
-                  {/* Footer Meta */}
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="truncate max-w-[200px]" title={r.source_url}>
-                      {r.source_url.replace(/^https?:\/\//, '').split('/')[0]}
-                    </span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Source vérifiée</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleCopyCitation(`${r.title} — ${r.source_url}`, i)}
+                            title="Copier la référence"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                          >
+                            {copiedIndex === i ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          </button>
+                          <a
+                            href={r.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Consulter la source originale"
+                            className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline p-1"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteResult(r.id)}
+                            disabled={deletingId === r.id}
+                            title="Supprimer ce résultat de l'enquête"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                          >
+                            {deletingId === r.id ? <Loader2 size={14} className="animate-spin text-rose-500" /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Content with thumbnail if present */}
+                      <div className="flex gap-3">
+                        {img && (
+                          <div
+                            onClick={() => setPreviewImage(img)}
+                            className="shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 cursor-pointer hover:opacity-90 transition relative group"
+                            title="Agrandir l'image"
+                          >
+                            <img
+                              src={img}
+                              alt={r.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e: any) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+                              <Eye size={14} />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                            {r.title}
+                          </h3>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
+                            {r.snippet || 'Aucune description disponible pour cette source.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Meta */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="truncate max-w-[200px]" title={r.source_url}>
+                        {r.source_url.replace(/^https?:\/\//, '').split('/')[0]}
+                      </span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">Source vérifiée</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Lightbox Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-2xl overflow-hidden p-2 shadow-2xl border border-slate-200 dark:border-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition z-10"
+              title="Fermer l'aperçu"
+            >
+              <X size={18} />
+            </button>
+            <img
+              src={previewImage}
+              alt="Aperçu OSINT"
+              className="max-h-[80vh] w-auto mx-auto object-contain rounded-xl"
+            />
+          </div>
         </div>
       )}
     </div>

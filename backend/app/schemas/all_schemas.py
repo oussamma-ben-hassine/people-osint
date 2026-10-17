@@ -64,6 +64,7 @@ class SearchResultRead(BaseModel):
     source_url: str
     title: str
     snippet: str
+    image_url: Optional[str] = None
     raw_data: Dict[str, Any] = {}
     created_at: datetime
 

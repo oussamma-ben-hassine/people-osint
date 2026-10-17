@@ -48,6 +48,7 @@ export const api = {
   getSearchResults: (id: string) => fetchJson<any[]>(`/api/v1/searches/${id}/results`),
   refreshSearch: (id: string) => fetchJson<SearchJob>(`/api/v1/searches/${id}/refresh`, { method: 'POST' }),
   cancelSearch: (id: string) => fetchJson<any>(`/api/v1/searches/${id}/cancel`, { method: 'POST' }),
+  deleteSearchResult: (searchId: string, resultId: string) => fetchJson<any>(`/api/v1/searches/${searchId}/results/${resultId}`, { method: 'DELETE' }),
 
   // Research Cases
   listCases: () => fetchJson<ResearchCase[]>('/api/v1/research-cases'),

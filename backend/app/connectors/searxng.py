@@ -38,6 +38,7 @@ class SearXNGConnector(SearchConnector):
         results = []
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
+                # 1. Text & Web Search
                 resp = await client.get(f"{self.base_url}/search", params=params)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -45,16 +46,48 @@ class SearXNGConnector(SearchConnector):
                         url = item.get("url", "")
                         if not url or not is_safe_external_url(url):
                             continue
+                        img = item.get("img_src") or item.get("thumbnail_src") or item.get("thumbnail")
+                        raw_dict = dict(item)
+                        if img:
+                            raw_dict["image_url"] = img
                         results.append(SearchResultItem(
                             connector=self.name,
                             source_url=url,
                             title=item.get("title", ""),
                             snippet=item.get("content", ""),
-                            raw_data=item,
+                            image_url=img,
+                            raw_data=raw_dict,
                             confidence=0.85
                         ))
+
+                # 2. Image Search (SearXNG images category)
+                params_img = {
+                    "q": q,
+                    "categories": "images",
+                    "format": "json",
+                    "safesearch": "1",
+                }
+                resp_img = await client.get(f"{self.base_url}/search", params=params_img)
+                if resp_img.status_code == 200:
+                    data_img = resp_img.json()
+                    for item in data_img.get("results", [])[:8]:
+                        img_url = item.get("img_src") or item.get("thumbnail_src") or item.get("url")
+                        source_page = item.get("url") or img_url
+                        if img_url and is_safe_external_url(img_url):
+                            raw_img = dict(item)
+                            raw_img["image_url"] = img_url
+                            raw_img["is_image"] = True
+                            results.append(SearchResultItem(
+                                connector="searxng-images",
+                                source_url=source_page,
+                                title=item.get("title") or f"Image trouvée pour {full_name}",
+                                snippet=item.get("content") or f"Photographie ou média indexé via {item.get('engine', 'SearXNG')}",
+                                image_url=img_url,
+                                raw_data=raw_img,
+                                confidence=0.8
+                            ))
         except Exception:
-            # When SearXNG container is starting or offline, return clean empty list
+            # When SearXNG container is starting or offline, return clean list
             pass
 
         return results

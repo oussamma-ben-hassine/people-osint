@@ -18,12 +18,17 @@ class GitLabConnector(SearchConnector):
                 resp = await client.get(url, params={"search": full_name, "per_page": 5})
                 if resp.status_code == 200:
                     for u in resp.json():
+                        avatar = u.get("avatar_url")
+                        raw_u = dict(u)
+                        if avatar:
+                            raw_u["image_url"] = avatar
                         results.append(SearchResultItem(
                             connector=self.name,
                             source_url=u.get("web_url", ""),
                             title=f"{u.get('name')} (@{u.get('username')}) on GitLab",
                             snippet=f"GitLab public developer account: {u.get('name')}, bio: {u.get('bio', '')}",
-                            raw_data=u,
+                            image_url=avatar,
+                            raw_data=raw_u,
                             confidence=0.85
                         ))
         except Exception:
