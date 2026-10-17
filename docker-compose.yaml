@@ -166,7 +166,6 @@ services:
     restart: always
     volumes:
       - ./infrastructure/searxng/settings.yml:/etc/searxng/settings.yml:ro
-      - ./infrastructure/searxng/uwsgi.ini:/etc/searxng/uwsgi.ini:ro
     environment:
       - SEARXNG_BASE_URL=http://people-searxng:8080
     networks:

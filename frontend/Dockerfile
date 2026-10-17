@@ -36,7 +36,4 @@ USER nextjs
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=15s \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/manifest.json || exit 1
-
-CMD ["sh", "-c", "if [ -f server.js ]; then node server.js; elif [ -f frontend/server.js ]; then cd frontend && node server.js; else find . -name server.js -exec node {} \\;; fi"]
+CMD ["node", "server.js"]
