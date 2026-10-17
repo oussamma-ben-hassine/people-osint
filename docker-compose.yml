@@ -87,6 +87,9 @@ services:
         condition: service_healthy
 
   people-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: people-api:latest
     container_name: people-worker
     restart: always
@@ -106,6 +109,9 @@ services:
         condition: service_healthy
 
   people-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: people-api:latest
     container_name: people-beat
     restart: always
