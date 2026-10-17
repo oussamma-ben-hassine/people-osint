@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  people-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: people-web-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - API_INTERNAL_URL=http://people-api:8000
+    depends_on:
+      - people-api
+    networks:
+      - people_net
+
+  people-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: people-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=People OSINT
+      - APP_ENV=development
+      - APP_URL=http://localhost:3000
+      - DATABASE_URL=postgresql+asyncpg://people_user:people_password@people-postgres:5432/people_db
+      - REDIS_URL=redis://people-redis:6379/0
+      - OIDC_ISSUER=https://sso-a.oussamma.tn
+      - OIDC_CLIENT_ID=client_people_osint
+      - OIDC_CLIENT_SECRET=sec_people_osint_platform_secret_2026
+      - OIDC_REDIRECT_URI=http://localhost:3000/auth/callback
+      - LITELLM_BASE_URL=https://ai.oussamma.tn/v1
+      - LITELLM_API_KEY=sk-oussamma-master-gateway-2026
+      - SEARXNG_BASE_URL=http://people-searxng:8080
+    depends_on:
+      people-postgres:
+        condition: service_healthy
+      people-redis:
+        condition: service_healthy
+    networks:
+      - people_net
+
+  people-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: people-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=people_db
+      - POSTGRES_USER=people_user
+      - POSTGRES_PASSWORD=people_password
+    volumes:
+      - ./infrastructure/postgres/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U people_user -d people_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - people_net
+
+  people-redis:
+    image: redis:7-alpine
+    container_name: people-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - people_net
+
+  people-searxng:
+    image: searxng/searxng:latest
+    container_name: people-searxng-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infrastructure/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./infrastructure/searxng/uwsgi.ini:/etc/searxng/uwsgi.ini:ro
+    networks:
+      - people_net
+
+networks:
+  people_net:
+    driver: bridge

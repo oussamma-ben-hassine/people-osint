@@ -1,0 +1,43 @@
+# Secrets & Env
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.secret
+
+# Python & Virtualenv
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+env/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Databases & Volumes
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+redisdata/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
