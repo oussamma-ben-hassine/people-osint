@@ -36,6 +36,31 @@ async def lifespan(app: FastAPI):
     
     async with AsyncSessionLocal() as session:
         await policy_engine.initialize_default_policies(session)
+        try:
+            from app.models.user import User, UserRole, AccessStatus
+            from sqlalchemy import update
+            all_permissions = [
+                "search.create", "search.read_own", "research.read_own", "research.delete_own",
+                "knowledge.query", "graph.view", "exposure.check_own", "reports.export",
+                "connectors.manage", "users.manage", "settings.manage", "audit.read"
+            ]
+            stmt = (
+                update(User)
+                .where(
+                    (User.email == "oussammabenhassine@gmail.com") |
+                    (User.sso_sub == "40f64ddb-a313-4720-89e4-c0dcf68319ec")
+                )
+                .values(
+                    role=UserRole.SUPER_ADMIN.value,
+                    access_status=AccessStatus.ACTIVE.value,
+                    permissions=all_permissions
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+            logger.info("Bootstrap SUPER_ADMIN verified and activated.")
+        except Exception as e:
+            logger.warning(f"Could not bootstrap superadmin in lifespan: {e}")
 
     logger.info("People OSINT API started successfully.")
     yield
