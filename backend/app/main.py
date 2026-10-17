@@ -21,10 +21,17 @@ from app.api.v1.admin import router as admin_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("people_osint")
 
+from sqlalchemy import text
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing database schema and policies...")
     async with engine.begin() as conn:
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
+        except Exception as e:
+            logger.warning(f"Could not create extensions (might already exist or not supported): {e}")
         await conn.run_sync(Base.metadata.create_all)
     
     async with AsyncSessionLocal() as session:
