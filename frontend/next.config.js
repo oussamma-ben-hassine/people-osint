@@ -12,7 +12,7 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
-    const apiInternal = process.env.API_INTERNAL_URL || 'http://localhost:8000';
+    const apiInternal = process.env.API_INTERNAL_URL || 'http://people-api:8000';
     return [
       {
         source: '/api/:path*',
