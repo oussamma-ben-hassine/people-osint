@@ -1,0 +1,184 @@
+version: '3.8'
+
+services:
+  people-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: people-web:latest
+    container_name: people-web
+    restart: always
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - API_INTERNAL_URL=http://people-api:8000
+      - NEXT_PUBLIC_SSO_URL=${OIDC_ISSUER:-https://sso-a.oussamma.tn}
+    ports:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/manifest.json"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      coolify:
+        aliases:
+          - people-web
+      internal_net:
+        aliases:
+          - people-web
+    depends_on:
+      people-api:
+        condition: service_healthy
+
+  people-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: people-api:latest
+    container_name: people-api
+    restart: always
+    environment:
+      - APP_NAME=People OSINT
+      - APP_ENV=production
+      - APP_URL=https://people.oussamma.tn
+      - PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-people_user}:${POSTGRES_PASSWORD:-people_sec_db_2026}@people-postgres:5432/${POSTGRES_DB:-people_db}
+      - DATABASE_SYNC_URL=postgresql+psycopg2://${POSTGRES_USER:-people_user}:${POSTGRES_PASSWORD:-people_sec_db_2026}@people-postgres:5432/${POSTGRES_DB:-people_db}
+      - REDIS_URL=redis://people-redis:6379/0
+      - OIDC_ISSUER=${OIDC_ISSUER:-https://sso-a.oussamma.tn}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-client_people_osint}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-sec_people_osint_platform_secret_2026}
+      - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI:-https://people.oussamma.tn/auth/callback}
+      - INITIAL_SUPERADMIN_ISSUER=${INITIAL_SUPERADMIN_ISSUER:-https://sso-a.oussamma.tn}
+      - INITIAL_SUPERADMIN_SUB=${INITIAL_SUPERADMIN_SUB}
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-https://ai.oussamma.tn/v1}
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-sk-oussamma-master-gateway-2026}
+      - LITELLM_CHAT_MODEL=${LITELLM_CHAT_MODEL:-gemini/gemini-3.1-flash-lite-preview}
+      - LITELLM_EMBEDDING_MODEL=${LITELLM_EMBEDDING_MODEL:-text-embedding-3-small}
+      - LITELLM_TIMEOUT=45
+      - SEARXNG_BASE_URL=http://people-searxng:8080
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - HIBP_API_KEY=${HIBP_API_KEY}
+      - SESSION_SECRET=${SESSION_SECRET:-people_osint_secure_session_key_2026}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-people_osint_aes_gcm_secret_2026}
+      - DEFAULT_ACCESS_POLICY=deny
+      - AI_ENABLED=true
+      - KNOWLEDGE_RETENTION_DAYS=30
+      - EXPORT_RETENTION_DAYS=7
+    ports:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      internal_net:
+        aliases:
+          - people-api
+    depends_on:
+      people-postgres:
+        condition: service_healthy
+      people-redis:
+        condition: service_healthy
+
+  people-worker:
+    image: people-api:latest
+    container_name: people-worker
+    restart: always
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-l", "info", "-c", "4"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-people_user}:${POSTGRES_PASSWORD:-people_sec_db_2026}@people-postgres:5432/${POSTGRES_DB:-people_db}
+      - REDIS_URL=redis://people-redis:6379/0
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-https://ai.oussamma.tn/v1}
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-sk-oussamma-master-gateway-2026}
+      - SEARXNG_BASE_URL=http://people-searxng:8080
+    networks:
+      internal_net:
+        aliases:
+          - people-worker
+    depends_on:
+      people-api:
+        condition: service_healthy
+
+  people-beat:
+    image: people-api:latest
+    container_name: people-beat
+    restart: always
+    command: ["celery", "-A", "app.workers.celery_app", "beat", "-l", "info"]
+    environment:
+      - REDIS_URL=redis://people-redis:6379/0
+    networks:
+      internal_net:
+        aliases:
+          - people-beat
+    depends_on:
+      people-worker:
+        condition: service_started
+
+  people-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: people-postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-people_db}
+      - POSTGRES_USER=${POSTGRES_USER:-people_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-people_sec_db_2026}
+    volumes:
+      - people_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-people_user} -d ${POSTGRES_DB:-people_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      internal_net:
+        aliases:
+          - people-postgres
+
+  people-redis:
+    image: redis:7-alpine
+    container_name: people-redis
+    restart: always
+    volumes:
+      - people_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      internal_net:
+        aliases:
+          - people-redis
+
+  people-searxng:
+    image: searxng/searxng:latest
+    container_name: people-searxng
+    restart: always
+    volumes:
+      - ./infrastructure/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./infrastructure/searxng/uwsgi.ini:/etc/searxng/uwsgi.ini:ro
+    environment:
+      - SEARXNG_BASE_URL=http://people-searxng:8080
+    networks:
+      internal_net:
+        aliases:
+          - people-searxng
+
+networks:
+  internal_net:
+    driver: bridge
+  coolify:
+    external: true
+
+volumes:
+  people_pgdata:
+  people_redisdata:
