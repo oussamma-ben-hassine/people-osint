@@ -6,7 +6,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     image: people-web:latest
-    container_name: people-web
     restart: always
     environment:
       - PORT=3000
@@ -37,7 +36,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: people-api:latest
-    container_name: people-api
     restart: always
     environment:
       - APP_NAME=People OSINT
@@ -91,7 +89,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: people-api:latest
-    container_name: people-worker
     restart: always
     command: ["celery", "-A", "app.workers.celery_app", "worker", "-l", "info", "-c", "4"]
     environment:
@@ -113,7 +110,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: people-api:latest
-    container_name: people-beat
     restart: always
     command: ["celery", "-A", "app.workers.celery_app", "beat", "-l", "info"]
     environment:
@@ -128,7 +124,6 @@ services:
 
   people-postgres:
     image: pgvector/pgvector:pg16
-    container_name: people-postgres
     restart: always
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-people_db}
@@ -149,7 +144,6 @@ services:
 
   people-redis:
     image: redis:7-alpine
-    container_name: people-redis
     restart: always
     volumes:
       - people_redisdata:/data
@@ -166,7 +160,6 @@ services:
 
   people-searxng:
     image: searxng/searxng:latest
-    container_name: people-searxng
     restart: always
     volumes:
       - ./infrastructure/searxng/settings.yml:/etc/searxng/settings.yml:ro
